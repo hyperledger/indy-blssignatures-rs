@@ -1,0 +1,27 @@
+[package]
+authors = ["The Hyperledger Aries Contributors"]
+description = "Hyperledger Indy BLS Signatures"
+documentation = "https://docs.rs/indy-blssignatures"
+edition = "2018"
+license = "Apache-2.0"
+name = "indy-blssignatures"
+readme = "README.md"
+repository = "https://github.com/hyperledger/indy-blssignatures-rs"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["serde"]
+
+[dependencies]
+amcl = "0.2"
+rand = "0.8"
+serde = { version = "1", optional = true, features = ["derive"] }
+sha2 = "0.10"
+sha3 = "0.10"
+
+[dev-dependencies]
+hex = "0.4"
+serde_json = "1"
