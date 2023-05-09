@@ -29,3 +29,14 @@ To start, all that is needed is to add this to your `Cargo.toml`.
 [dependencies]
 indy-blssignatures = "0.1"
 ```
+
+This implementation of BLS Signatures was initially in the [Hyperledger Ursa]
+project and is used in the [Hyperledger Indy Node] and [Hyperledger Indy Plenum]
+repositories/artifacts.
+
+A Python wrapper for this crate can be found in the [indy-bls-wrapper-python] repository.
+
+[Hyperledger Ursa]: https://github.com/hyperledger/ursa
+[Hyperledger Indy Node]: https://github.com/hyperledger/indy-node
+[Hyperledger Indy Plenum]: https://github.com/hyperledger/indy-plenum
+[indy-bls-wrapper-python]: https://github.com/hyperledger/indy-bls-wrapper-python
