@@ -21,7 +21,14 @@ Diffie–Hellman group.
 
 ## Rust Crate
 
-This crate implements the BLS signature scheme.
+This crate implements a version of the BLS signature scheme. The implementation
+doesn't match up with the [BLS signatures specification at the IETF]. This
+implementation uses the BN254 curve defined here:
+[https://neuromancer.sk/std/bn/bn254](https://neuromancer.sk/std/bn/bn254)
+(sometimes called BN254N), and should not to be confused with the one used in
+Ethereum.
+
+[BLS signatures specification at the IETF]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05
 
 To start, all that is needed is to add this to your `Cargo.toml`.
 
