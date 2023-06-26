@@ -29,7 +29,7 @@ Maintainers are assigned the following scopes in this repository:
 | Nathan George     | nage               | Admin             |      |            |       |                     |
 | Philipp Schlarb   | pSchlarb           | Maintainer        |      |            |       |                     |
 | Stephen Curran    | swcurran           | Admin             |      |            |       |                     |
-| Timo Glastro      | TimoGlastro        | Maintainer        |      |            |       |                     |
+| Timo Glastra      | TimoGlastra        | Maintainer        |      |            |       |                     |
 | Wade Barnes       | WadeBarnes         | Admin, Maintainer |      |            |       |                     |
 
 ## Emeritus Maintainers
