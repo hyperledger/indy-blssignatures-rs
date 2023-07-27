@@ -1,6 +1,9 @@
+#![allow(unused)]
+
 use amcl::bn254::big::BIG;
 use amcl::bn254::ecp::ECP;
 use amcl::bn254::ecp2::ECP2;
+use amcl::bn254::fp::FP;
 use amcl::bn254::fp12::FP12;
 use amcl::bn254::fp2::FP2;
 use amcl::bn254::pair::{ate, ate2, fexp, g1mul, g2mul, gtpow};
@@ -10,6 +13,7 @@ use amcl::bn254::rom::{
 use amcl::rand::RAND;
 
 use std::fmt::{self, Debug, Formatter};
+use std::marker::PhantomData;
 
 #[cfg(feature = "serde")]
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
@@ -19,7 +23,9 @@ use rand::prelude::*;
 #[cfg(test)]
 use std::cell::RefCell;
 
-use crate::error::{Error as BlsError, Result as BlsResult};
+use crate::error::Result as ClResult;
+
+const ORDER: BIG = BIG { w: CURVE_ORDER };
 
 #[cfg(test)]
 thread_local! {
@@ -31,6 +37,7 @@ pub struct PairMocksHelper {}
 
 #[cfg(test)]
 impl PairMocksHelper {
+    #[allow(unused)]
     pub fn inject() {
         PAIR_USE_MOCKS.with(|use_mocks| {
             *use_mocks.borrow_mut() = true;
@@ -45,12 +52,12 @@ impl PairMocksHelper {
 }
 
 #[cfg(not(test))]
-fn random_mod_order() -> BlsResult<BIG> {
+fn random_mod_order() -> ClResult<BIG> {
     _random_mod_order()
 }
 
 #[cfg(test)]
-fn random_mod_order() -> BlsResult<BIG> {
+fn random_mod_order() -> ClResult<BIG> {
     if PairMocksHelper::is_injected() {
         Ok(BIG::from_hex(
             "22EB5716FB01F2122DE924466542B923D8C96F16C9B5FE2C00B7D7DC1499EA50".to_string(),
@@ -60,16 +67,50 @@ fn random_mod_order() -> BlsResult<BIG> {
     }
 }
 
-fn _random_mod_order() -> BlsResult<BIG> {
-    let entropy_bytes = 128;
-    let mut seed = vec![0; entropy_bytes];
+fn _random_mod_order() -> ClResult<BIG> {
+    const ENTROPY: usize = 128;
+    let mut seed = [0; ENTROPY];
     let mut rng = rand::thread_rng();
     rng.fill_bytes(seed.as_mut_slice());
     let mut rng = RAND::new();
-    rng.clean();
     // AMCL recommends to initialise from at least 128 bytes, check doc for `RAND.seed`
-    rng.seed(entropy_bytes, &seed);
-    Ok(BIG::randomnum(&BIG::new_ints(&CURVE_ORDER), &mut rng))
+    rng.seed(ENTROPY, &seed);
+    Ok(BIG::randomnum(&ORDER, &mut rng))
+}
+
+pub trait CurvePoint: Debug + Serialize + for<'a> Deserialize<'a> + Sized {
+    const BYTES_REPR_SIZE: usize;
+
+    /// Creates new random point
+    fn new() -> ClResult<Self>;
+
+    /// Creates new infinity point
+    fn new_inf() -> ClResult<Self>;
+
+    /// Checks infinity
+    fn is_inf(&self) -> ClResult<bool>;
+
+    /// Encode in hexadecimal format
+    fn to_string(&self) -> ClResult<String>;
+
+    /// Decode from hexadecimal format
+    fn from_string(val: &str) -> ClResult<Self> {
+        let res = Self::from_string_inf(val)?;
+        if res.is_inf()? {
+            Err(err_msg!("Invalid point: infinity"))
+        } else {
+            Ok(res)
+        }
+    }
+
+    /// Decode from hexadecimal format, allowing for the infinity point
+    fn from_string_inf(val: &str) -> ClResult<Self>;
+
+    /// Encode in binary format (big endian)
+    fn to_bytes(&self) -> ClResult<Vec<u8>>;
+
+    /// Decode from binary (big endian) format
+    fn from_bytes(b: &[u8]) -> ClResult<Self>;
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -77,11 +118,11 @@ pub struct PointG1 {
     point: ECP,
 }
 
-impl PointG1 {
-    pub const BYTES_REPR_SIZE: usize = MODBYTES * 4;
+impl CurvePoint for PointG1 {
+    const BYTES_REPR_SIZE: usize = MODBYTES * 4;
 
     /// Creates new random PointG1
-    pub fn new() -> BlsResult<PointG1> {
+    fn new() -> ClResult<PointG1> {
         // generate random point from the group G1
         let point_x = BIG::new_ints(&CURVE_GX);
         let point_y = BIG::new_ints(&CURVE_GY);
@@ -93,28 +134,51 @@ impl PointG1 {
     }
 
     /// Creates new infinity PointG1
-    pub fn new_inf() -> BlsResult<PointG1> {
+    fn new_inf() -> ClResult<PointG1> {
         let mut r = ECP::new();
         r.inf();
         Ok(PointG1 { point: r })
     }
 
     /// Checks infinity
-    pub fn is_inf(&self) -> BlsResult<bool> {
+    fn is_inf(&self) -> ClResult<bool> {
         Ok(self.point.is_infinity())
     }
 
-    /// PointG1 ^ GroupOrderElement
-    pub fn mul(&self, e: &GroupOrderElement) -> BlsResult<PointG1> {
-        let r = self.point;
-        let mut bn = e.bn;
-        Ok(PointG1 {
-            point: g1mul(&r, &mut bn),
-        })
+    fn to_string(&self) -> ClResult<String> {
+        Ok(self.point.to_hex())
     }
 
+    fn from_string_inf(val: &str) -> ClResult<PointG1> {
+        pre_validate_point(val, 3)?;
+        let point = ECP::from_hex(val.to_string());
+        if is_valid_ecp(&point) {
+            Ok(PointG1 { point })
+        } else {
+            Err(err_msg!("Invalid PointG1"))
+        }
+    }
+
+    fn to_bytes(&self) -> ClResult<Vec<u8>> {
+        let mut vec = vec![0u8; Self::BYTES_REPR_SIZE];
+        self.point.tobytes(&mut vec, false);
+        Ok(vec)
+    }
+
+    fn from_bytes(b: &[u8]) -> ClResult<PointG1> {
+        if b.len() != Self::BYTES_REPR_SIZE {
+            Err(err_msg!("Invalid byte length for PointG1"))
+        } else {
+            Ok(PointG1 {
+                point: ECP::frombytes(b),
+            })
+        }
+    }
+}
+
+impl PointG1 {
     /// PointG1 * PointG1
-    pub fn add(&self, q: &PointG1) -> BlsResult<PointG1> {
+    pub fn add(&self, q: &PointG1) -> ClResult<PointG1> {
         let mut r = self.point;
         let point = q.point;
         r.add(&point);
@@ -122,7 +186,7 @@ impl PointG1 {
     }
 
     /// PointG1 / PointG1
-    pub fn sub(&self, q: &PointG1) -> BlsResult<PointG1> {
+    pub fn sub(&self, q: &PointG1) -> ClResult<PointG1> {
         let mut r = self.point;
         let point = q.point;
         r.sub(&point);
@@ -130,39 +194,22 @@ impl PointG1 {
     }
 
     /// 1 / PointG1
-    pub fn neg(&self) -> BlsResult<PointG1> {
+    pub fn neg(&self) -> ClResult<PointG1> {
         let mut r = self.point;
         r.neg();
         Ok(PointG1 { point: r })
     }
 
-    pub fn to_string(&self) -> BlsResult<String> {
-        Ok(self.point.to_hex())
-    }
-
-    pub fn from_string(str: &str) -> BlsResult<PointG1> {
+    /// PointG1 ^ GroupOrderElement
+    pub fn mul(&self, e: &GroupOrderElement) -> ClResult<PointG1> {
+        let r = self.point;
+        let mut bn = e.bn;
         Ok(PointG1 {
-            point: ECP::from_hex(str.to_string()),
+            point: g1mul(&r, &mut bn),
         })
     }
 
-    pub fn to_bytes(&self) -> BlsResult<Vec<u8>> {
-        let mut vec = vec![0u8; Self::BYTES_REPR_SIZE];
-        self.point.tobytes(&mut vec, false);
-        Ok(vec)
-    }
-
-    pub fn from_bytes(b: &[u8]) -> BlsResult<PointG1> {
-        if b.len() != Self::BYTES_REPR_SIZE {
-            Err(BlsError::new("Invalid byte length for PointG1"))
-        } else {
-            Ok(PointG1 {
-                point: ECP::frombytes(b),
-            })
-        }
-    }
-
-    pub fn from_hash(hash: &[u8]) -> BlsResult<PointG1> {
+    pub fn from_hash(hash: &[u8]) -> ClResult<PointG1> {
         let mut el = GroupOrderElement::from_bytes(hash)?;
         let mut point = ECP::new_big(&el.bn);
 
@@ -200,24 +247,7 @@ impl<'a> Deserialize<'a> for PointG1 {
     where
         D: Deserializer<'a>,
     {
-        struct PointG1Visitor;
-
-        impl<'a> Visitor<'a> for PointG1Visitor {
-            type Value = PointG1;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("expected PointG1")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<PointG1, E>
-            where
-                E: serde::de::Error,
-            {
-                PointG1::from_string(value).map_err(E::custom)
-            }
-        }
-
-        deserializer.deserialize_str(PointG1Visitor)
+        deserializer.deserialize_str(CurvePointVisitor::<PointG1>::default())
     }
 }
 
@@ -226,11 +256,11 @@ pub struct PointG2 {
     point: ECP2,
 }
 
-impl PointG2 {
-    pub const BYTES_REPR_SIZE: usize = MODBYTES * 4;
+impl CurvePoint for PointG2 {
+    const BYTES_REPR_SIZE: usize = MODBYTES * 4;
 
     /// Creates new random PointG2
-    pub fn new() -> BlsResult<PointG2> {
+    fn new() -> ClResult<PointG2> {
         let point_xa = BIG::new_ints(&CURVE_PXA);
         let point_xb = BIG::new_ints(&CURVE_PXB);
         let point_ya = BIG::new_ints(&CURVE_PYA);
@@ -247,15 +277,51 @@ impl PointG2 {
     }
 
     /// Creates new infinity PointG2
-    pub fn new_inf() -> BlsResult<PointG2> {
+    fn new_inf() -> ClResult<PointG2> {
         let mut point = ECP2::new();
         point.inf();
-
         Ok(PointG2 { point })
     }
 
+    /// Checks infinity
+    fn is_inf(&self) -> ClResult<bool> {
+        Ok(self.point.is_infinity())
+    }
+
+    fn to_string(&self) -> ClResult<String> {
+        Ok(self.point.to_hex())
+    }
+
+    fn from_string_inf(val: &str) -> ClResult<PointG2> {
+        pre_validate_point(val, 6)?;
+        let point = ECP2::from_hex(val.to_string());
+        if is_valid_ecp2(&point) {
+            Ok(PointG2 { point })
+        } else {
+            Err(err_msg!("Invalid PointG2"))
+        }
+    }
+
+    fn to_bytes(&self) -> ClResult<Vec<u8>> {
+        let mut vec = vec![0u8; Self::BYTES_REPR_SIZE];
+        self.point.tobytes(&mut vec);
+        Ok(vec)
+    }
+
+    fn from_bytes(b: &[u8]) -> ClResult<PointG2> {
+        if b.len() != Self::BYTES_REPR_SIZE {
+            Err(err_msg!("Invalid byte length for PointG2"))
+        } else {
+            Ok(PointG2 {
+                point: ECP2::frombytes(b),
+            })
+        }
+    }
+}
+
+impl PointG2 {
     /// PointG2 * PointG2
-    pub fn add(&self, q: &PointG2) -> BlsResult<PointG2> {
+    pub fn add(&self, q: &PointG2) -> ClResult<PointG2> {
         let mut r = self.point;
         let point = q.point;
         r.add(&point);
@@ -264,7 +330,7 @@ impl PointG2 {
     }
 
     /// PointG2 / PointG2
-    pub fn sub(&self, q: &PointG2) -> BlsResult<PointG2> {
+    pub fn sub(&self, q: &PointG2) -> ClResult<PointG2> {
         let mut r = self.point;
         let point = q.point;
         r.sub(&point);
@@ -272,45 +338,19 @@ impl PointG2 {
         Ok(PointG2 { point: r })
     }
 
-    pub fn neg(&self) -> BlsResult<PointG2> {
+    pub fn neg(&self) -> ClResult<PointG2> {
         let mut r = self.point;
         r.neg();
         Ok(PointG2 { point: r })
     }
 
     /// PointG2 ^ GroupOrderElement
-    pub fn mul(&self, e: &GroupOrderElement) -> BlsResult<PointG2> {
+    pub fn mul(&self, e: &GroupOrderElement) -> ClResult<PointG2> {
         let r = self.point;
         let bn = e.bn;
         Ok(PointG2 {
             point: g2mul(&r, &bn),
         })
-    }
-
-    pub fn to_string(&self) -> BlsResult<String> {
-        Ok(self.point.to_hex())
-    }
-
-    pub fn from_string(str: &str) -> BlsResult<PointG2> {
-        Ok(PointG2 {
-            point: ECP2::from_hex(str.to_string()),
-        })
-    }
-
-    pub fn to_bytes(&self) -> BlsResult<Vec<u8>> {
-        let mut vec = vec![0u8; Self::BYTES_REPR_SIZE];
-        self.point.tobytes(&mut vec);
-        Ok(vec)
-    }
-
-    pub fn from_bytes(b: &[u8]) -> BlsResult<PointG2> {
-        if b.len() != Self::BYTES_REPR_SIZE {
-            Err(BlsError::new("Invalid byte length for PointG2"))
-        } else {
-            Ok(PointG2 {
-                point: ECP2::frombytes(b),
-            })
-        }
     }
 }
 
@@ -339,24 +379,7 @@ impl<'a> Deserialize<'a> for PointG2 {
     where
         D: Deserializer<'a>,
     {
-        struct PointG2Visitor;
-
-        impl<'a> Visitor<'a> for PointG2Visitor {
-            type Value = PointG2;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("expected PointG2")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<PointG2, E>
-            where
-                E: serde::de::Error,
-            {
-                PointG2::from_string(value).map_err(E::custom)
-            }
-        }
-
-        deserializer.deserialize_str(PointG2Visitor)
+        deserializer.deserialize_str(CurvePointVisitor::<PointG2>::default())
     }
 }
 
@@ -368,120 +391,113 @@ pub struct GroupOrderElement {
 impl GroupOrderElement {
     pub const BYTES_REPR_SIZE: usize = MODBYTES;
 
-    pub fn new() -> BlsResult<GroupOrderElement> {
+    pub fn new() -> ClResult<GroupOrderElement> {
         // returns random element in 0, ..., GroupOrder-1
         Ok(GroupOrderElement {
             bn: random_mod_order()?,
         })
     }
 
-    pub fn new_from_seed(seed: &[u8]) -> BlsResult<GroupOrderElement> {
+    pub fn zero() -> ClResult<GroupOrderElement> {
+        Ok(GroupOrderElement { bn: BIG::new() })
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.bn.iszilch()
+    }
+
+    pub fn new_from_seed(seed: &[u8]) -> ClResult<GroupOrderElement> {
         // returns random element in 0, ..., GroupOrder-1
         if seed.len() != MODBYTES {
-            return Err(BlsError::new("Invalid byte length for seed"));
+            return Err(err_msg!("Invalid byte length for seed"));
         }
         let mut rng = RAND::new();
-        rng.clean();
         rng.seed(seed.len(), seed);
 
         Ok(GroupOrderElement {
-            bn: BIG::randomnum(&BIG::new_ints(&CURVE_ORDER), &mut rng),
+            bn: BIG::randomnum(&ORDER, &mut rng),
         })
     }
 
     /// (GroupOrderElement ^ GroupOrderElement) mod GroupOrder
-    pub fn pow_mod(&self, e: &GroupOrderElement) -> BlsResult<GroupOrderElement> {
+    pub fn pow_mod(&self, e: &GroupOrderElement) -> ClResult<GroupOrderElement> {
         let mut base = self.bn;
-        let pow = e.bn;
         Ok(GroupOrderElement {
-            bn: base.powmod(&pow, &BIG::new_ints(&CURVE_ORDER)),
+            bn: base.powmod(&e.bn, &ORDER),
         })
     }
 
     /// (GroupOrderElement + GroupOrderElement) mod GroupOrder
-    pub fn add_mod(&self, r: &GroupOrderElement) -> BlsResult<GroupOrderElement> {
+    pub fn add_mod(&self, r: &GroupOrderElement) -> ClResult<GroupOrderElement> {
         let mut sum = self.bn;
         sum.add(&r.bn);
-        sum.rmod(&BIG::new_ints(&CURVE_ORDER));
+        sum.rmod(&ORDER);
+        sum.norm();
         Ok(GroupOrderElement { bn: sum })
     }
 
     /// (GroupOrderElement - GroupOrderElement) mod GroupOrder
-    pub fn sub_mod(&self, r: &GroupOrderElement) -> BlsResult<GroupOrderElement> {
-        //need to use modneg if sub is negative
-        let mut diff = self.bn;
-        diff.sub(&r.bn);
-        let mut zero = BIG::new();
-        zero.zero();
-
-        if diff < zero {
-            return Ok(GroupOrderElement {
-                bn: BIG::modneg(&diff, &BIG::new_ints(&CURVE_ORDER)),
-            });
-        }
-
-        Ok(GroupOrderElement { bn: diff })
+    pub fn sub_mod(&self, r: &GroupOrderElement) -> ClResult<GroupOrderElement> {
+        let mut sum = self.bn;
+        sum.add(&ORDER);
+        sum.sub(&r.bn);
+        sum.rmod(&ORDER);
+        sum.norm();
+        Ok(GroupOrderElement { bn: sum })
     }
 
     /// (GroupOrderElement * GroupOrderElement) mod GroupOrder
-    pub fn mul_mod(&self, r: &GroupOrderElement) -> BlsResult<GroupOrderElement> {
-        let base = self.bn;
-        let r = r.bn;
+    pub fn mul_mod(&self, r: &GroupOrderElement) -> ClResult<GroupOrderElement> {
         Ok(GroupOrderElement {
-            bn: BIG::modmul(&base, &r, &BIG::new_ints(&CURVE_ORDER)),
+            bn: BIG::modmul(&self.bn, &r.bn, &ORDER),
         })
     }
 
     /// 1 / GroupOrderElement
-    pub fn inverse(&self) -> BlsResult<GroupOrderElement> {
+    pub fn inverse(&self) -> ClResult<GroupOrderElement> {
         let mut bn = self.bn;
-        bn.invmodp(&BIG::new_ints(&CURVE_ORDER));
-
+        bn.invmodp(&ORDER);
         Ok(GroupOrderElement { bn })
     }
 
     /// - GroupOrderElement mod GroupOrder
-    pub fn mod_neg(&self) -> BlsResult<GroupOrderElement> {
-        let mut r = self.bn;
-        r = BIG::modneg(&r, &BIG::new_ints(&CURVE_ORDER));
-        Ok(GroupOrderElement { bn: r })
+    pub fn mod_neg(&self) -> ClResult<GroupOrderElement> {
+        let mut bn = self.bn;
+        bn.rmod(&ORDER);
+        bn.rsub(&ORDER);
+        bn.norm();
+        Ok(GroupOrderElement { bn })
     }
 
-    pub fn to_string(&self) -> BlsResult<String> {
+    pub fn to_string(&self) -> ClResult<String> {
         let mut bn = self.bn;
         Ok(bn.to_hex())
     }
 
-    pub fn from_string(str: &str) -> BlsResult<GroupOrderElement> {
-        Ok(GroupOrderElement {
-            bn: BIG::from_hex(str.to_string()),
-        })
+    pub fn from_string(str: &str) -> ClResult<GroupOrderElement> {
+        let mut bn = BIG::from_hex(str.to_string());
+        bn.rmod(&ORDER);
+        bn.norm();
+        Ok(GroupOrderElement { bn })
     }
 
-    pub fn to_bytes(&self) -> BlsResult<Vec<u8>> {
+    pub fn to_bytes(&self) -> ClResult<Vec<u8>> {
         let mut bn = self.bn;
         let mut vec = vec![0u8; Self::BYTES_REPR_SIZE];
         bn.tobytes(&mut vec);
         Ok(vec)
     }
 
-    pub fn from_bytes(b: &[u8]) -> BlsResult<GroupOrderElement> {
+    pub fn from_bytes(b: &[u8]) -> ClResult<GroupOrderElement> {
         if b.len() > Self::BYTES_REPR_SIZE {
-            return Err(BlsError::new("Invalid byte length for GroupOrderElement"));
+            return Err(err_msg!("Invalid byte length for GroupOrderElement"));
         }
-        let mut vec = b.to_vec();
-        let len = vec.len();
-        if len < MODBYTES {
-            let diff = MODBYTES - len;
-            let mut result = vec![0; diff];
-            result.append(&mut vec);
-            return Ok(GroupOrderElement {
-                bn: BIG::frombytes(&result),
-            });
-        }
-        Ok(GroupOrderElement {
-            bn: BIG::frombytes(b),
-        })
+        let mut buf = [0u8; Self::BYTES_REPR_SIZE];
+        buf[(Self::BYTES_REPR_SIZE - b.len())..].copy_from_slice(&b);
+        let mut bn = BIG::frombytes(&buf);
+        bn.rmod(&BIG::new_ints(&CURVE_ORDER));
+        bn.norm();
+        Ok(GroupOrderElement { bn })
     }
 }
 
@@ -539,8 +555,9 @@ pub struct Pair {
 
 impl Pair {
     pub const BYTES_REPR_SIZE: usize = MODBYTES * 16;
+
     /// e(PointG1, PointG2)
-    pub fn pair(p: &PointG1, q: &PointG2) -> BlsResult<Self> {
+    pub fn pair(p: &PointG1, q: &PointG2) -> ClResult<Self> {
         let mut result = fexp(&ate(&q.point, &p.point));
         result.reduce();
 
@@ -548,15 +565,22 @@ impl Pair {
     }
 
     /// e(PointG1, PointG2, PointG1_1, PointG2_1)
-    pub fn pair2(p: &PointG1, q: &PointG2, r: &PointG1, s: &PointG2) -> BlsResult<Self> {
+    pub fn pair2(p: &PointG1, q: &PointG2, r: &PointG1, s: &PointG2) -> ClResult<Self> {
         let mut result = fexp(&ate2(&q.point, &p.point, &s.point, &r.point));
         result.reduce();
 
         Ok(Self { pair: result })
     }
 
+    #[allow(unused)]
+    pub fn new_unity() -> ClResult<Self> {
+        Ok(Self {
+            pair: FP12::new_int(1),
+        })
+    }
+
     /// e() * e()
-    pub fn mul(&self, b: &Pair) -> BlsResult<Pair> {
+    pub fn mul(&self, b: &Pair) -> ClResult<Pair> {
         let mut base = self.pair;
         base.mul(&b.pair);
         base.reduce();
@@ -564,34 +588,38 @@ impl Pair {
     }
 
     /// e() ^ GroupOrderElement
-    pub fn pow(&self, b: &GroupOrderElement) -> BlsResult<Pair> {
+    pub fn pow(&self, b: &GroupOrderElement) -> ClResult<Pair> {
         Ok(Pair {
             pair: gtpow(&self.pair, &b.bn),
         })
     }
 
     /// 1 / e()
-    pub fn inverse(&self) -> BlsResult<Pair> {
+    pub fn inverse(&self) -> ClResult<Pair> {
         let mut r = self.pair;
         r.conj();
         Ok(Pair { pair: r })
     }
 
-    pub fn is_unity(&self) -> BlsResult<bool> {
+    pub fn is_unity(&self) -> ClResult<bool> {
         Ok(self.pair.isunity())
     }
 
-    pub fn to_string(&self) -> BlsResult<String> {
+    pub fn to_string(&self) -> ClResult<String> {
         Ok(self.pair.to_hex())
     }
 
-    pub fn from_string(str: &str) -> BlsResult<Pair> {
-        Ok(Pair {
-            pair: FP12::from_hex(str.to_string()),
-        })
+    pub fn from_string(val: &str) -> ClResult<Pair> {
+        pre_validate_point(val, 12)?;
+        let pair = FP12::from_hex(val.to_string());
+        if is_valid_pair(&pair) {
+            Ok(Pair { pair })
+        } else {
+            Err(err_msg!("Invalid pair"))
+        }
     }
 
-    pub fn to_bytes(&self) -> BlsResult<Vec<u8>> {
+    pub fn to_bytes(&self) -> ClResult<Vec<u8>> {
         let mut r = self.pair;
         let mut vec = vec![0u8; Self::BYTES_REPR_SIZE];
         r.tobytes(&mut vec);
@@ -645,6 +673,172 @@ impl<'a> Deserialize<'a> for Pair {
     }
 }
 
+fn pre_validate_point(val: &str, components: usize) -> ClResult<()> {
+    let mut parts = val.split_ascii_whitespace();
+    let mut idx = 0;
+    let valid = loop {
+        if idx == components {
+            break parts.next().is_none();
+        }
+        if let Some(idx) = parts.next() {
+            match idx.parse::<u32>() {
+                Ok(0) | Err(_) => break false,
+                Ok(_) => {}
+            }
+        } else {
+            break false;
+        }
+        if let Some(hex) = parts.next() {
+            if validate_hex(hex.as_bytes()).is_none() {
+                break false;
+            }
+        } else {
+            break false;
+        }
+        idx += 1;
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(err_msg!("Invalid point value"))
+    }
+}
+
+const fn validate_hex(bytes: &[u8]) -> Option<usize> {
+    let mut i = 0;
+    while i < bytes.len() {
+        if !matches!(bytes[i], b'0'..=b'9' | b'a' ..= b'f' | b'A'..=b'F') {
+            return None;
+        }
+        i += 1;
+    }
+    Some((bytes.len() + 1) / 2)
+}
+
+fn is_valid_ecp(point: &ECP) -> bool {
+    // validate point without inverting z:
+    // (y/z)^2 = (x/z)^3 + b  -->  y^2z = x^3 + bz^3
+    let (x, z) = (point.getpx(), point.getpz());
+    let mut lhs = point.getpy();
+    lhs.reduce();
+    lhs.sqr();
+    lhs.mul(&z);
+    let mut rhs = x;
+    rhs.reduce();
+    rhs.sqr();
+    rhs.mul(&x);
+    lhs.sub(&rhs);
+    rhs.copy(&z);
+    rhs.reduce();
+    rhs.sqr();
+    rhs.mul(&z);
+    rhs.dbl(); // b = 2
+    lhs.equals(&rhs)
+}
+
+fn is_valid_ecp2(point: &ECP2) -> bool {
+    // validate point without inverting z:
+    // (y/z)^2 = (x/z)^3 + b'  -->  y^2z = x^3 + b'z^3
+    let (x, z) = (point.getpx(), point.getpz());
+    let mut lhs = point.getpy();
+    lhs.reduce();
+    lhs.norm();
+    lhs.sqr();
+    lhs.norm();
+    lhs.mul(&z);
+    let mut rhs = x;
+    rhs.reduce();
+    rhs.sqr();
+    rhs.mul(&x);
+    lhs.sub(&rhs);
+    rhs.copy(&z);
+    rhs.reduce();
+    rhs.sqr();
+    rhs.mul(&z);
+    let bp = FP2::new_fps(&FP::new_int(1), &FP::new_int(-1)); // b' = b/ξ = 1 - i
+    rhs.mul(&bp);
+    lhs.equals(&rhs)
+}
+
+fn is_valid_pair(point: &FP12) -> bool {
+    // Subgroup security in pairing-based cryptography
+    // Section 5.2  https://eprint.iacr.org/2015/247
+    // Check that g^(p^4 - p^2 + 1) = 1  ==>  g^(p^4 + 1) == g^(p^2)
+    let f = FP2::new_bigs(
+        &BIG::new_ints(&amcl::bn254::rom::FRA),
+        &BIG::new_ints(&amcl::bn254::rom::FRB),
+    );
+    let mut lhs = *point;
+    lhs.frob(&f);
+    lhs.frob(&f);
+    let mut rhs = lhs;
+    rhs.frob(&f);
+    rhs.frob(&f);
+    rhs.mul(&point);
+    lhs.equals(&rhs)
+}
+
+pub(crate) struct CurvePointVisitor<P> {
+    allow_inf: bool,
+    _pd: PhantomData<P>,
+}
+
+impl<P> CurvePointVisitor<P> {
+    pub fn new(allow_inf: bool) -> Self {
+        Self {
+            allow_inf,
+            _pd: PhantomData,
+        }
+    }
+}
+
+impl<P> Default for CurvePointVisitor<P> {
+    fn default() -> Self {
+        Self::new(false)
+    }
+}
+
+impl<'a, P: CurvePoint> Visitor<'a> for CurvePointVisitor<P> {
+    type Value = P;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("expected curve point")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<P, E>
+    where
+        E: serde::de::Error,
+    {
+        if self.allow_inf {
+            P::from_string_inf(value).map_err(E::custom)
+        } else {
+            P::from_string(value).map_err(E::custom)
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct InfPoint<P: CurvePoint> {
+    #[serde(deserialize_with = "deserialize_allow_inf")]
+    inner: P,
+}
+
+pub fn deserialize_allow_inf<'de, D, P>(data: D) -> Result<P, D::Error>
+where
+    D: Deserializer<'de>,
+    P: CurvePoint,
+{
+    data.deserialize_str(CurvePointVisitor::<P>::new(true))
+}
+
+pub fn deserialize_opt_allow_inf<'de, D, P>(data: D) -> Result<Option<P>, D::Error>
+where
+    D: Deserializer<'de>,
+    P: CurvePoint,
+{
+    Ok(Option::<InfPoint<P>>::deserialize(data)?.map(|p| p.inner))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -653,6 +847,23 @@ mod tests {
     fn group_order_element_new_from_seed_works_for_invalid_seed_len() {
         let res = GroupOrderElement::new_from_seed(&[0, 1, 2]);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn group_order_element_sub_mod() {
+        let res = GroupOrderElement::new().unwrap();
+        assert_eq!(
+            res.sub_mod(&res.mod_neg().unwrap()).unwrap(),
+            res.add_mod(&res).unwrap()
+        );
+        assert_eq!(
+            res.mod_neg().unwrap().sub_mod(&res).unwrap(),
+            res.add_mod(&res).unwrap().mod_neg().unwrap()
+        );
+        assert_eq!(
+            res.sub_mod(&res).unwrap(),
+            GroupOrderElement::zero().unwrap()
+        );
     }
 
     #[test]
@@ -705,6 +916,15 @@ mod tests {
         let pair_result = pair1.mul(&pair2).unwrap();
         let pair3 = pair_result.mul(&pair1.inverse().unwrap()).unwrap();
         assert_eq!(pair2, pair3);
+
+        let r = GroupOrderElement::new().unwrap();
+        assert_eq!(
+            Pair::pair(&p1.mul(&r).unwrap(), &q1)
+                .unwrap()
+                .inverse()
+                .unwrap(),
+            Pair::pair(&p1.mul(&r.mod_neg().unwrap()).unwrap(), &q1).unwrap()
+        );
     }
 }
 
@@ -761,24 +981,39 @@ mod serialization_tests {
     #[test]
     fn serialize_deserialize_works_for_point_g1() {
         let structure = TestPointG1Structure {
-            field: PointG1::from_string("1 09181F00DD41F2F92026FC20E189DE31926EEE6E05C6A17E676556E08075C6 1 09BC971251F977993486B19600760C4F972925D98934EA6B2D0BEC671398C0 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8").unwrap()
+            field: PointG1::from_string("1 1D18E69FA5AA97421F4AEBE933B40264261C5440090222C6AC61FEBE2CFEAA04 1 1461756FB88E41A2CB508A7057318CAFB551F4CD0C7051CBEC23DDFBC92248BC 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8").unwrap()
         };
-
         let deserialized: TestPointG1Structure =
             serde_json::from_str(&serde_json::to_string(&structure).unwrap()).unwrap();
-
         assert_eq!(structure, deserialized);
+
+        // check invalid input
+        assert!(PointG1::from_string(",").is_err());
+        // check non-subgroup point
+        assert!(PointG1::from_string("1 09181F00DD41F2F92026FC20E189DE31926EEE6E05C6A17E676556E08075C6 1 09BC971251F977993486B19600760C4F972925D98934EA6B2D0BEC671398C0 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8").is_err());
+        // check disallowed infinity
+        assert!(PointG1::from_string("1 0000000000000000000000000000000000000000000000000000000000000000 2 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8 1 0000000000000000000000000000000000000000000000000000000000000000").is_err());
+        // check allowed infinity
+        assert!(PointG1::from_string_inf("1 0000000000000000000000000000000000000000000000000000000000000000 2 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8 1 0000000000000000000000000000000000000000000000000000000000000000").is_ok());
     }
 
     #[test]
     fn deserialize_works_for_point_g2() {
         let structure = TestPointG2Structure {
-            field: PointG2::from_string("1 16027A65C15E16E00BFCAD948F216B5CFBE07B98876D8889A5DEE03DE7C57B 1 0EC9DBC2286A9485A0DA8525C5BE0F88E27C2B3C337E522DDC170C1764D615 1 1A021C8EFE70DCC7F81DD8E8CDC74F3D64E63E886C73B3A8B9849696E99FF3 1 2505CB0CFAAE75ACCAF60CB5A9F7E7A8250918155886E7FFF9A32D7B5A0500 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8 1 00000000000000000000000000000000000000000000000000000000000000").unwrap()
+            field: PointG2::from_string("1 1045C93522D11FB9EB69396032EEA008B857C7F8B3F2981C9917B1DFA8A00EC9 1 01AD44557A4240BB570FB94B33746C272CF921F33B4910B111F1CA48FCE34FC2 1 2265EAFAED9C22CD76C2FBD6FC3B88414B6B66FB4E31FCD1ED6AADE25A9D31EB 1 234B062F5159CB2E0782CFB75478E45D46EBF0F21E3CE7A2CD758687A73D5D08 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8 1 0000000000000000000000000000000000000000000000000000000000000000").unwrap()
         };
         let deserialized: TestPointG2Structure =
             serde_json::from_str(&serde_json::to_string(&structure).unwrap()).unwrap();
-
         assert_eq!(structure, deserialized);
+
+        // check invalid input
+        assert!(PointG2::from_string(",").is_err());
+        // check non-subgroup point
+        assert!(PointG2::from_string("1 16027A65C15E16E00BFCAD948F216B5CFBE07B98876D8889A5DEE03DE7C57B 1 0EC9DBC2286A9485A0DA8525C5BE0F88E27C2B3C337E522DDC170C1764D615 1 1A021C8EFE70DCC7F81DD8E8CDC74F3D64E63E886C73B3A8B9849696E99FF3 1 2505CB0CFAAE75ACCAF60CB5A9F7E7A8250918155886E7FFF9A32D7B5A0500 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8 1 00000000000000000000000000000000000000000000000000000000000000").is_err());
+        // check disallowed infinity
+        assert!(PointG2::from_string("1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 2 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000").is_err());
+        // check allowed infinity
+        assert!(PointG2::from_string_inf("1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 2 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000").is_ok());
     }
 
     #[test]
@@ -793,17 +1028,23 @@ mod serialization_tests {
     #[test]
     fn serialize_deserialize_works_for_pair() {
         let point_g1 = PointG1 {
-            point: PointG1::from_string("1 01FC3950C5B03061739A4621E205643FDCC1BFE2AC0F2996F46944F7AC340B 1 1056E3F5EE2EA7F7E340764B7BE8A38AAFE66C25573880810726812069BB11 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8").unwrap().point
+            point: PointG1::from_string("1 1D18E69FA5AA97421F4AEBE933B40264261C5440090222C6AC61FEBE2CFEAA04 1 1461756FB88E41A2CB508A7057318CAFB551F4CD0C7051CBEC23DDFBC92248BC 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8").unwrap().point
         };
         let point_g2 = PointG2 {
-            point: PointG2::from_string("1 16027A65C15E16E00BFCAD948F216B5CFBE07B98876D8889A5DEE03DE7C57B 1 0EC9DBC2286A9485A0DA8525C5BE0F88E27C2B3C337E522DDC170C1764D615 1 1A021C8EFE70DCC7F81DD8E8CDC74F3D64E63E886C73B3A8B9849696E99FF3 1 2505CB0CFAAE75ACCAF60CB5A9F7E7A8250918155886E7FFF9A32D7B5A0500 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8 1 00000000000000000000000000000000000000000000000000000000000000").unwrap().point
+            point: PointG2::from_string("1 1045C93522D11FB9EB69396032EEA008B857C7F8B3F2981C9917B1DFA8A00EC9 1 01AD44557A4240BB570FB94B33746C272CF921F33B4910B111F1CA48FCE34FC2 1 2265EAFAED9C22CD76C2FBD6FC3B88414B6B66FB4E31FCD1ED6AADE25A9D31EB 1 234B062F5159CB2E0782CFB75478E45D46EBF0F21E3CE7A2CD758687A73D5D08 1 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8 1 0000000000000000000000000000000000000000000000000000000000000000").unwrap().point
         };
         let pair = TestPairStructure {
             field: Pair::pair(&point_g1, &point_g2).unwrap(),
         };
         let deserialized: TestPairStructure =
             serde_json::from_str(&serde_json::to_string(&pair).unwrap()).unwrap();
-
         assert_eq!(pair, deserialized);
+
+        // check invalid input
+        assert!(Pair::from_string(",").is_err());
+        // check non-subgroup point
+        assert!(Pair::from_string("1 1A0FB1F80E3C1FB1D99656B1B6DDF183D5EF4760838C68B088E892C846B7DC2C 1 1235B7EF46F16A30D6481B2A63E672EBCD931DFE1FE8B4101EA6F8A65FBDCD05 1 02CFBC531AD1C591ACC4F90806D4C8D1D2E7CA1701281076E62DFDFCB743ED0F 1 2472470CB4C5E83208F7CB8FA1C2AFE168CE964EAC3AA0F00D0F851B9BFD640B 1 15010B4BD62468BB8D19513CA350D731E47E034570164DFAE0939F2540FE6132 1 145BB54DDFB66D9C48655F9F7700CC2A341A7BB0B73BA0271927D23A1C9F80A0 1 236FB4C3A3500BF02E7A95A8041ED9C789D57DE3EB9952F773EF8C35953B1FA9 1 152902DA32832510A0DBDE0BE32F6E0DC01374D0DA5B00B30E7A5DFEDF9DE0C7 1 15A9F25FC4079A513FA5B1982AE2808F5D577A8CAE17A030B03B3B10E4606449 1 0CCF8D3EF066E5C4C79106F0A4A5490DD69507161510E56CA43FA304277D2DC7 1 14AB69814995CABA1A07C0B5F8A75B27074CA5CD4213974007B866E0BFE3CA06 1 0151272518EBB8E894FEFB11E19BB4D748F31213DB50454659E1011C2B73FC7C").is_err());
+        // check unity
+        assert!(Pair::from_string("2 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000").unwrap().is_unity().unwrap());
     }
 }

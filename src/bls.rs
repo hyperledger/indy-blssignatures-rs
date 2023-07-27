@@ -1,4 +1,4 @@
-use crate::amcl::{GroupOrderElement, Pair, PointG1, PointG2};
+use crate::amcl::{CurvePoint, GroupOrderElement, Pair, PointG1, PointG2};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
