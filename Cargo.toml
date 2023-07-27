@@ -25,3 +25,7 @@ sha3 = "0.10"
 [dev-dependencies]
 hex = "0.4"
 serde_json = "1"
+
+[[bench]]
+name = "bls"
+harness = false
