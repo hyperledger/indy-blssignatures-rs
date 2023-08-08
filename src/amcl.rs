@@ -7,13 +7,10 @@ use amcl::bn254::fp::FP;
 use amcl::bn254::fp12::FP12;
 use amcl::bn254::fp2::FP2;
 use amcl::bn254::pair::{ate, ate2, fexp, g1mul, g2mul, gtpow};
-use amcl::bn254::rom::{
-    CURVE_GX, CURVE_GY, CURVE_ORDER, CURVE_PXA, CURVE_PXB, CURVE_PYA, CURVE_PYB, MODBYTES,
-};
+use amcl::bn254::rom::{CURVE_ORDER, MODBYTES};
 use amcl::rand::RAND;
 
 use std::fmt::{self, Debug, Formatter};
-use std::marker::PhantomData;
 
 #[cfg(feature = "serde")]
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
@@ -78,23 +75,78 @@ fn _random_mod_order() -> BlsResult<BIG> {
     Ok(BIG::randomnum(&ORDER, &mut rng))
 }
 
-pub trait CurvePoint: Debug + Sized {
-    const BYTES_REPR_SIZE: usize;
+#[derive(Copy, Clone, PartialEq)]
+pub struct PointG1 {
+    point: ECP,
+}
 
-    /// Creates new random point
-    fn new() -> BlsResult<Self>;
+impl PointG1 {
+    // This should be MODBYTES * 2 + 1, but is maintained for compatibility
+    pub const BYTES_REPR_SIZE: usize = MODBYTES * 4;
 
-    /// Creates new infinity point
-    fn new_inf() -> BlsResult<Self>;
+    /// Creates new random PointG1
+    pub fn new() -> BlsResult<Self> {
+        Self::new_generator()?.mul(&GroupOrderElement::new()?)
+    }
+
+    /// Creates new infinity PointG1
+    pub fn new_inf() -> BlsResult<Self> {
+        let mut r = ECP::new();
+        r.inf();
+        Ok(PointG1 { point: r })
+    }
+
+    /// Create the generator point
+    pub fn new_generator() -> BlsResult<Self> {
+        Ok(PointG1 {
+            point: ECP::generator(),
+        })
+    }
 
     /// Checks infinity
-    fn is_inf(&self) -> BlsResult<bool>;
+    pub fn is_inf(&self) -> BlsResult<bool> {
+        Ok(self.point.is_infinity())
+    }
 
-    /// Encode in hexadecimal format
-    fn to_string(&self) -> BlsResult<String>;
+    /// PointG1 * PointG1
+    pub fn add(&self, q: &PointG1) -> BlsResult<Self> {
+        let mut r = self.point;
+        let point = q.point;
+        r.add(&point);
+        Ok(PointG1 { point: r })
+    }
+
+    /// PointG1 / PointG1
+    pub fn sub(&self, q: &PointG1) -> BlsResult<Self> {
+        let mut r = self.point;
+        let point = q.point;
+        r.sub(&point);
+        Ok(PointG1 { point: r })
+    }
+
+    /// 1 / PointG1
+    pub fn neg(&self) -> BlsResult<Self> {
+        let mut r = self.point;
+        r.neg();
+        Ok(PointG1 { point: r })
+    }
+
+    /// PointG1 ^ GroupOrderElement
+    pub fn mul(&self, e: &GroupOrderElement) -> BlsResult<Self> {
+        let r = self.point;
+        let mut bn = e.bn;
+        Ok(PointG1 {
+            point: g1mul(&r, &mut bn),
+        })
+    }
+
+    /// Encode to hexadecimal format
+    pub fn to_string(&self) -> BlsResult<String> {
+        Ok(self.point.to_hex())
+    }
 
     /// Decode from hexadecimal format
-    fn from_string(val: &str) -> BlsResult<Self> {
+    pub fn from_string(val: &str) -> BlsResult<Self> {
         let res = Self::from_string_inf(val)?;
         if res.is_inf()? {
             Err(err_msg!("Invalid point: infinity"))
@@ -104,52 +156,7 @@ pub trait CurvePoint: Debug + Sized {
     }
 
     /// Decode from hexadecimal format, allowing for the infinity point
-    fn from_string_inf(val: &str) -> BlsResult<Self>;
-
-    /// Encode in binary format (big endian)
-    fn to_bytes(&self) -> BlsResult<Vec<u8>>;
-
-    /// Decode from binary (big endian) format
-    fn from_bytes(b: &[u8]) -> BlsResult<Self>;
-}
-
-#[derive(Copy, Clone, PartialEq)]
-pub struct PointG1 {
-    point: ECP,
-}
-
-impl CurvePoint for PointG1 {
-    const BYTES_REPR_SIZE: usize = MODBYTES * 4;
-
-    /// Creates new random PointG1
-    fn new() -> BlsResult<PointG1> {
-        // generate random point from the group G1
-        let point_x = BIG::new_ints(&CURVE_GX);
-        let point_y = BIG::new_ints(&CURVE_GY);
-        let gen_g1 = ECP::new_bigs(&point_x, &point_y);
-
-        let point = g1mul(&gen_g1, &mut random_mod_order()?);
-
-        Ok(PointG1 { point })
-    }
-
-    /// Creates new infinity PointG1
-    fn new_inf() -> BlsResult<PointG1> {
-        let mut r = ECP::new();
-        r.inf();
-        Ok(PointG1 { point: r })
-    }
-
-    /// Checks infinity
-    fn is_inf(&self) -> BlsResult<bool> {
-        Ok(self.point.is_infinity())
-    }
-
-    fn to_string(&self) -> BlsResult<String> {
-        Ok(self.point.to_hex())
-    }
-
-    fn from_string_inf(val: &str) -> BlsResult<PointG1> {
+    pub fn from_string_inf(val: &str) -> BlsResult<Self> {
         pre_validate_point(val, 3)?;
         let point = ECP::from_hex(val.to_string());
         if is_valid_ecp(&point) {
@@ -159,13 +166,16 @@ impl CurvePoint for PointG1 {
         }
     }
 
-    fn to_bytes(&self) -> BlsResult<Vec<u8>> {
+    /// Encode to binary format (big-endian)
+    pub fn to_bytes(&self) -> BlsResult<Vec<u8>> {
         let mut vec = vec![0u8; Self::BYTES_REPR_SIZE];
         self.point.tobytes(&mut vec, false);
         Ok(vec)
     }
 
-    fn from_bytes(b: &[u8]) -> BlsResult<PointG1> {
+    /// Decode from binary format (big-endian)
+    #[allow(unused)]
+    pub fn from_bytes(b: &[u8]) -> BlsResult<Self> {
         if b.len() != Self::BYTES_REPR_SIZE {
             Err(err_msg!("Invalid byte length for PointG1"))
         } else {
@@ -174,42 +184,9 @@ impl CurvePoint for PointG1 {
             })
         }
     }
-}
 
-impl PointG1 {
-    /// PointG1 * PointG1
-    pub fn add(&self, q: &PointG1) -> BlsResult<PointG1> {
-        let mut r = self.point;
-        let point = q.point;
-        r.add(&point);
-        Ok(PointG1 { point: r })
-    }
-
-    /// PointG1 / PointG1
-    pub fn sub(&self, q: &PointG1) -> BlsResult<PointG1> {
-        let mut r = self.point;
-        let point = q.point;
-        r.sub(&point);
-        Ok(PointG1 { point: r })
-    }
-
-    /// 1 / PointG1
-    pub fn neg(&self) -> BlsResult<PointG1> {
-        let mut r = self.point;
-        r.neg();
-        Ok(PointG1 { point: r })
-    }
-
-    /// PointG1 ^ GroupOrderElement
-    pub fn mul(&self, e: &GroupOrderElement) -> BlsResult<PointG1> {
-        let r = self.point;
-        let mut bn = e.bn;
-        Ok(PointG1 {
-            point: g1mul(&r, &mut bn),
-        })
-    }
-
-    pub fn from_hash(hash: &[u8]) -> BlsResult<PointG1> {
+    #[allow(unused)]
+    pub fn from_hash(hash: &[u8]) -> BlsResult<Self> {
         let mut el = GroupOrderElement::from_bytes(hash)?;
         let mut point = ECP::new_big(&el.bn);
 
@@ -247,7 +224,7 @@ impl<'a> Deserialize<'a> for PointG1 {
     where
         D: Deserializer<'a>,
     {
-        deserializer.deserialize_str(CurvePointVisitor::<PointG1>::default())
+        deserializer.deserialize_str(StrVisitor("expected PointG1", Self::from_string))
     }
 }
 
@@ -256,70 +233,33 @@ pub struct PointG2 {
     point: ECP2,
 }
 
-impl CurvePoint for PointG2 {
-    const BYTES_REPR_SIZE: usize = MODBYTES * 4;
+impl PointG2 {
+    pub const BYTES_REPR_SIZE: usize = MODBYTES * 4;
 
     /// Creates new random PointG2
-    fn new() -> BlsResult<PointG2> {
-        let point_xa = BIG::new_ints(&CURVE_PXA);
-        let point_xb = BIG::new_ints(&CURVE_PXB);
-        let point_ya = BIG::new_ints(&CURVE_PYA);
-        let point_yb = BIG::new_ints(&CURVE_PYB);
-
-        let point_x = FP2::new_bigs(&point_xa, &point_xb);
-        let point_y = FP2::new_bigs(&point_ya, &point_yb);
-
-        let gen_g2 = ECP2::new_fp2s(&point_x, &point_y);
-
-        let point = g2mul(&gen_g2, &random_mod_order()?);
-
-        Ok(PointG2 { point })
+    pub fn new() -> BlsResult<Self> {
+        Self::new_generator()?.mul(&GroupOrderElement::new()?)
     }
 
     /// Creates new infinity PointG2
-    fn new_inf() -> BlsResult<PointG2> {
+    pub fn new_inf() -> BlsResult<Self> {
         let mut point = ECP2::new();
         point.inf();
         Ok(PointG2 { point })
     }
 
+    /// Create the generator point
+    pub fn new_generator() -> BlsResult<PointG2> {
+        Ok(PointG2 {
+            point: ECP2::generator(),
+        })
+    }
+
     /// Checks infinity
-    fn is_inf(&self) -> BlsResult<bool> {
+    pub fn is_inf(&self) -> BlsResult<bool> {
         Ok(self.point.is_infinity())
     }
 
-    fn to_string(&self) -> BlsResult<String> {
-        Ok(self.point.to_hex())
-    }
-
-    fn from_string_inf(val: &str) -> BlsResult<PointG2> {
-        pre_validate_point(val, 6)?;
-        let point = ECP2::from_hex(val.to_string());
-        if is_valid_ecp2(&point) {
-            Ok(PointG2 { point })
-        } else {
-            Err(err_msg!("Invalid PointG2"))
-        }
-    }
-
-    fn to_bytes(&self) -> BlsResult<Vec<u8>> {
-        let mut vec = vec![0u8; Self::BYTES_REPR_SIZE];
-        self.point.tobytes(&mut vec);
-        Ok(vec)
-    }
-
-    fn from_bytes(b: &[u8]) -> BlsResult<PointG2> {
-        if b.len() != Self::BYTES_REPR_SIZE {
-            Err(err_msg!("Invalid byte length for PointG2"))
-        } else {
-            Ok(PointG2 {
-                point: ECP2::frombytes(b),
-            })
-        }
-    }
-}
-
-impl PointG2 {
     /// PointG2 * PointG2
     pub fn add(&self, q: &PointG2) -> BlsResult<PointG2> {
         let mut r = self.point;
@@ -352,6 +292,50 @@ impl PointG2 {
             point: g2mul(&r, &bn),
         })
     }
+
+    /// Encode to hexadecimal format
+    pub fn to_string(&self) -> BlsResult<String> {
+        Ok(self.point.to_hex())
+    }
+
+    /// Decode from hexadecimal format
+    pub fn from_string(val: &str) -> BlsResult<Self> {
+        let res = Self::from_string_inf(val)?;
+        if res.is_inf()? {
+            Err(err_msg!("Invalid point: infinity"))
+        } else {
+            Ok(res)
+        }
+    }
+
+    /// Decode from hexadecimal format, allowing for the infinity point
+    pub fn from_string_inf(val: &str) -> BlsResult<PointG2> {
+        pre_validate_point(val, 6)?;
+        let point = ECP2::from_hex(val.to_string());
+        if is_valid_ecp2(&point) {
+            Ok(PointG2 { point })
+        } else {
+            Err(err_msg!("Invalid PointG2"))
+        }
+    }
+
+    /// Encode to binary format (big-endian)
+    pub fn to_bytes(&self) -> BlsResult<Vec<u8>> {
+        let mut vec = vec![0u8; Self::BYTES_REPR_SIZE];
+        self.point.tobytes(&mut vec);
+        Ok(vec)
+    }
+
+    /// Decode from binary format (big-endian)
+    pub fn from_bytes(b: &[u8]) -> BlsResult<PointG2> {
+        if b.len() != Self::BYTES_REPR_SIZE {
+            Err(err_msg!("Invalid byte length for PointG2"))
+        } else {
+            Ok(PointG2 {
+                point: ECP2::frombytes(b),
+            })
+        }
+    }
 }
 
 impl Debug for PointG2 {
@@ -379,7 +363,7 @@ impl<'a> Deserialize<'a> for PointG2 {
     where
         D: Deserializer<'a>,
     {
-        deserializer.deserialize_str(CurvePointVisitor::<PointG2>::default())
+        deserializer.deserialize_str(StrVisitor("expected PointG2", Self::from_string))
     }
 }
 
@@ -527,24 +511,7 @@ impl<'a> Deserialize<'a> for GroupOrderElement {
     where
         D: Deserializer<'a>,
     {
-        struct GroupOrderElementVisitor;
-
-        impl<'a> Visitor<'a> for GroupOrderElementVisitor {
-            type Value = GroupOrderElement;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("expected GroupOrderElement")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<GroupOrderElement, E>
-            where
-                E: serde::de::Error,
-            {
-                GroupOrderElement::from_string(value).map_err(E::custom)
-            }
-        }
-
-        deserializer.deserialize_str(GroupOrderElementVisitor)
+        deserializer.deserialize_str(StrVisitor("expected GroupOrderElement", Self::from_string))
     }
 }
 
@@ -652,24 +619,7 @@ impl<'a> Deserialize<'a> for Pair {
     where
         D: Deserializer<'a>,
     {
-        struct PairVisitor;
-
-        impl<'a> Visitor<'a> for PairVisitor {
-            type Value = Pair;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("expected Pair")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Pair, E>
-            where
-                E: serde::de::Error,
-            {
-                Pair::from_string(value).map_err(E::custom)
-            }
-        }
-
-        deserializer.deserialize_str(PairVisitor)
+        deserializer.deserialize_str(StrVisitor("expected Pair", Self::from_string))
     }
 }
 
@@ -778,69 +728,27 @@ fn is_valid_pair(point: &FP12) -> bool {
     lhs.equals(&rhs)
 }
 
-pub(crate) struct CurvePointVisitor<P> {
-    allow_inf: bool,
-    _pd: PhantomData<P>,
-}
-
-impl<P> CurvePointVisitor<P> {
-    pub fn new(allow_inf: bool) -> Self {
-        Self {
-            allow_inf,
-            _pd: PhantomData,
-        }
-    }
-}
-
-impl<P> Default for CurvePointVisitor<P> {
-    fn default() -> Self {
-        Self::new(false)
-    }
-}
+#[cfg(feature = "serde")]
+#[derive(Debug)]
+pub(crate) struct StrVisitor<F>(pub &'static str, pub F);
 
 #[cfg(feature = "serde")]
-impl<'a, P: CurvePoint> Visitor<'a> for CurvePointVisitor<P> {
-    type Value = P;
+impl<'d, F, T> Visitor<'d> for StrVisitor<F>
+where
+    F: FnOnce(&str) -> BlsResult<T>,
+{
+    type Value = T;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("expected curve point")
+        formatter.write_str(self.0)
     }
 
-    fn visit_str<E>(self, value: &str) -> Result<P, E>
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        if self.allow_inf {
-            P::from_string_inf(value).map_err(E::custom)
-        } else {
-            P::from_string(value).map_err(E::custom)
-        }
+        self.1(value).map_err(E::custom)
     }
-}
-
-#[cfg(feature = "serde")]
-#[derive(Debug, Deserialize)]
-struct InfPoint<P: CurvePoint> {
-    #[serde(deserialize_with = "deserialize_allow_inf")]
-    inner: P,
-}
-
-#[cfg(feature = "serde")]
-pub fn deserialize_allow_inf<'de, D, P>(data: D) -> Result<P, D::Error>
-where
-    D: Deserializer<'de>,
-    P: CurvePoint,
-{
-    data.deserialize_str(CurvePointVisitor::<P>::new(true))
-}
-
-#[cfg(feature = "serde")]
-pub fn deserialize_opt_allow_inf<'de, D, P>(data: D) -> Result<Option<P>, D::Error>
-where
-    D: Deserializer<'de>,
-    P: CurvePoint,
-{
-    Ok(Option::<InfPoint<P>>::deserialize(data)?.map(|p| p.inner))
 }
 
 #[cfg(test)]
