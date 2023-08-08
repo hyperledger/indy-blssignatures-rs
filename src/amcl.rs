@@ -48,6 +48,13 @@ impl PairMocksHelper {
     }
 }
 
+fn _big_from_bytes(b: &[u8]) -> BIG {
+    let mut buf = [0u8; MODBYTES];
+    let len = b.len().min(MODBYTES);
+    buf[(MODBYTES - len)..].copy_from_slice(&b[..len]);
+    BIG::frombytes(&buf)
+}
+
 #[cfg(not(test))]
 fn random_mod_order() -> BlsResult<BIG> {
     _random_mod_order()
@@ -174,7 +181,6 @@ impl PointG1 {
     }
 
     /// Decode from binary format (big-endian)
-    #[allow(unused)]
     pub fn from_bytes(b: &[u8]) -> BlsResult<Self> {
         if b.len() != Self::BYTES_REPR_SIZE {
             Err(err_msg!("Invalid byte length for PointG1"))
@@ -185,14 +191,16 @@ impl PointG1 {
         }
     }
 
-    #[allow(unused)]
     pub fn from_hash(hash: &[u8]) -> BlsResult<Self> {
-        let mut el = GroupOrderElement::from_bytes(hash)?;
-        let mut point = ECP::new_big(&el.bn);
+        if hash.len() > GroupOrderElement::BYTES_REPR_SIZE {
+            return Err(err_msg!("Input exceeds maximum length"));
+        }
+        let mut bn = _big_from_bytes(hash);
+        let mut point = ECP::new_big(&bn);
 
         while point.is_infinity() {
-            el.bn.inc(1);
-            point = ECP::new_big(&el.bn);
+            bn.inc(1);
+            point = ECP::new_big(&bn);
         }
 
         Ok(PointG1 { point })
@@ -476,9 +484,7 @@ impl GroupOrderElement {
         if b.len() > Self::BYTES_REPR_SIZE {
             return Err(err_msg!("Invalid byte length for GroupOrderElement"));
         }
-        let mut buf = [0u8; Self::BYTES_REPR_SIZE];
-        buf[(Self::BYTES_REPR_SIZE - b.len())..].copy_from_slice(&b);
-        let mut bn = BIG::frombytes(&buf);
+        let mut bn = _big_from_bytes(b);
         bn.rmod(&BIG::new_ints(&CURVE_ORDER));
         bn.norm();
         Ok(GroupOrderElement { bn })
@@ -958,5 +964,13 @@ mod serialization_tests {
         assert!(Pair::from_string("1 1A0FB1F80E3C1FB1D99656B1B6DDF183D5EF4760838C68B088E892C846B7DC2C 1 1235B7EF46F16A30D6481B2A63E672EBCD931DFE1FE8B4101EA6F8A65FBDCD05 1 02CFBC531AD1C591ACC4F90806D4C8D1D2E7CA1701281076E62DFDFCB743ED0F 1 2472470CB4C5E83208F7CB8FA1C2AFE168CE964EAC3AA0F00D0F851B9BFD640B 1 15010B4BD62468BB8D19513CA350D731E47E034570164DFAE0939F2540FE6132 1 145BB54DDFB66D9C48655F9F7700CC2A341A7BB0B73BA0271927D23A1C9F80A0 1 236FB4C3A3500BF02E7A95A8041ED9C789D57DE3EB9952F773EF8C35953B1FA9 1 152902DA32832510A0DBDE0BE32F6E0DC01374D0DA5B00B30E7A5DFEDF9DE0C7 1 15A9F25FC4079A513FA5B1982AE2808F5D577A8CAE17A030B03B3B10E4606449 1 0CCF8D3EF066E5C4C79106F0A4A5490DD69507161510E56CA43FA304277D2DC7 1 14AB69814995CABA1A07C0B5F8A75B27074CA5CD4213974007B866E0BFE3CA06 1 0151272518EBB8E894FEFB11E19BB4D748F31213DB50454659E1011C2B73FC7C").is_err());
         // check unity
         assert!(Pair::from_string("2 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000 1 0000000000000000000000000000000000000000000000000000000000000000").unwrap().is_unity().unwrap());
+    }
+
+    #[test]
+    fn pointg1_from_hash_expected() {
+        let input = hex::decode("39b476fc3bec25434c60cd9db210dfbc29c5bba2ea82d0209eab036225f14c48")
+            .unwrap();
+        let expect = PointG1::from_string("2 1A08F5A609C3E3EEE4D26193538131BA6398B363B2AE45E67DC577158A7046BE 1 19BAB9992F89B2FA1B1A3A3EBE15456791351C51B74BF86B246DBB20BEDFA8D4 2 095E45DDF417D05FB10933FFC63D474548B7FFFF7888802F07FFFFFF7D07A8A8").unwrap();
+        assert_eq!(PointG1::from_hash(&input).unwrap(), expect);
     }
 }
