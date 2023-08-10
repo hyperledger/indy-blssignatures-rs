@@ -33,11 +33,9 @@ pub fn set_current_error(err: &Error) {
 }
 
 pub fn get_current_error_c_json() -> *const c_char {
-    let mut value = ptr::null();
-
-    CURRENT_ERROR_C_JSON.with(|err| err.borrow().as_ref().map(|err| value = err.as_ptr()));
-
-    value
+    CURRENT_ERROR_C_JSON
+        .with(|err| err.borrow_mut().take().map(CString::into_raw))
+        .unwrap_or(ptr::null_mut())
 }
 
 /// Get details for last occurred error.

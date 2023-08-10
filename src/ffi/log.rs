@@ -119,11 +119,9 @@ pub extern "C" fn indy_bls_set_custom_logger(
     if LOGGER
         .set(CustomLogger::new(context, enabled, log, flush))
         .is_err()
+        || log::set_logger(LOGGER.get().unwrap()).is_err()
     {
         return fail(err_msg!("Repeated logger initialization"));
-    }
-    if log::set_logger(LOGGER.get().unwrap()).is_err() {
-        fail(err_msg!("Repeated logger initialization"));
     }
     log::set_max_level(max_level);
     debug!("Initialized custom logger");
@@ -148,7 +146,7 @@ pub extern "C" fn indy_bls_set_default_logger() -> ErrorCode {
 }
 
 #[no_mangle]
-pub extern "C" fn askar_set_max_log_level(max_level: i32) -> ErrorCode {
+pub extern "C" fn indy_bls_set_max_log_level(max_level: i32) -> ErrorCode {
     if let Some(level) = get_level_filter(max_level) {
         log::set_max_level(level);
         ErrorCode::Success

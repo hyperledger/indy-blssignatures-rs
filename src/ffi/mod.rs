@@ -6,11 +6,19 @@ mod macros;
 mod error;
 mod log;
 
-use std::os::raw::c_void;
+use std::ffi::CString;
+use std::os::raw::{c_char, c_void};
 use std::slice;
 
 use self::error::{fail, ErrorCode};
 use crate::bls::*;
+
+#[no_mangle]
+pub unsafe extern "C" fn indy_bls_string_free(s: *mut c_char) {
+    if !s.is_null() {
+        drop(CString::from_raw(s));
+    }
+}
 
 /// Creates and returns random generator point that satisfy BLS algorithm requirements.
 ///
