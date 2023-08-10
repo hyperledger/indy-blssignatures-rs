@@ -8,6 +8,7 @@ name = "indy-blssignatures"
 readme = "README.md"
 repository = "https://github.com/hyperledger/indy-blssignatures-rs"
 version = "0.1.1"
+rust-version = "1.63"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
