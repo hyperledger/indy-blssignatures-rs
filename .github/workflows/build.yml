@@ -50,3 +50,6 @@ jobs:
 
       - name: Release build
         run: cargo build --release --all-targets
+
+      - name: FFI test build
+        run: cargo build --features ffi
