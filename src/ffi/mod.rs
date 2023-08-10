@@ -62,7 +62,7 @@ pub extern "C" fn indy_bls_generator_new(gen_p: *mut *const c_void) -> ErrorCode
 #[no_mangle]
 pub extern "C" fn indy_bls_generator_from_bytes(
     bytes: *const u8,
-    bytes_len: usize,
+    bytes_len: i32,
     gen_p: *mut *const c_void,
 ) -> ErrorCode {
     trace!(
@@ -105,7 +105,7 @@ pub extern "C" fn indy_bls_generator_from_bytes(
 pub extern "C" fn indy_bls_generator_as_bytes(
     gen: *const c_void,
     bytes_p: *mut *const u8,
-    bytes_len_p: *mut usize,
+    bytes_len_p: *mut i32,
 ) -> ErrorCode {
     trace!(
         "indy_bls_generator_as_bytes: >>> gen: {:?}, bytes_p: {:?}, bytes_len_p: {:?}",
@@ -122,7 +122,7 @@ pub extern "C" fn indy_bls_generator_as_bytes(
 
     unsafe {
         *bytes_p = gen.as_bytes().as_ptr();
-        *bytes_len_p = gen.as_bytes().len();
+        *bytes_len_p = gen.as_bytes().len() as i32;
     };
 
     let res = ErrorCode::Success;
@@ -161,7 +161,7 @@ pub extern "C" fn indy_bls_generator_free(gen: *const c_void) -> ErrorCode {
 #[no_mangle]
 pub extern "C" fn indy_bls_sign_key_new(
     seed: *const u8,
-    seed_len: usize,
+    seed_len: i32,
     sign_key_p: *mut *const c_void,
 ) -> ErrorCode {
     trace!(
@@ -202,7 +202,7 @@ pub extern "C" fn indy_bls_sign_key_new(
 #[no_mangle]
 pub extern "C" fn indy_bls_sign_key_from_bytes(
     bytes: *const u8,
-    bytes_len: usize,
+    bytes_len: i32,
     sign_key_p: *mut *const c_void,
 ) -> ErrorCode {
     trace!(
@@ -251,7 +251,7 @@ pub extern "C" fn indy_bls_sign_key_from_bytes(
 pub extern "C" fn indy_bls_sign_key_as_bytes(
     sign_key: *const c_void,
     bytes_p: *mut *const u8,
-    bytes_len_p: *mut usize,
+    bytes_len_p: *mut i32,
 ) -> ErrorCode {
     trace!(
         "indy_bls_sign_key_as_bytes: >>> sign_key: {:?}, bytes_p: {:?}, bytes_len_p: {:?}",
@@ -271,7 +271,7 @@ pub extern "C" fn indy_bls_sign_key_as_bytes(
 
     unsafe {
         *bytes_p = sign_key.as_bytes().as_ptr();
-        *bytes_len_p = sign_key.as_bytes().len();
+        *bytes_len_p = sign_key.as_bytes().len() as i32;
     };
 
     let res = ErrorCode::Success;
@@ -359,7 +359,7 @@ pub extern "C" fn indy_bls_ver_key_new(
 #[no_mangle]
 pub extern "C" fn indy_bls_ver_key_from_bytes(
     bytes: *const u8,
-    bytes_len: usize,
+    bytes_len: i32,
     ver_key_p: *mut *const c_void,
 ) -> ErrorCode {
     trace!(
@@ -402,7 +402,7 @@ pub extern "C" fn indy_bls_ver_key_from_bytes(
 pub extern "C" fn indy_bls_ver_key_as_bytes(
     ver_key: *const c_void,
     bytes_p: *mut *const u8,
-    bytes_len_p: *mut usize,
+    bytes_len_p: *mut i32,
 ) -> ErrorCode {
     trace!(
         "indy_bls_sign_key_as_bytes: >>> ver_key: {:?}, bytes_p: {:?}, bytes_len_p: {:?}",
@@ -419,7 +419,7 @@ pub extern "C" fn indy_bls_ver_key_as_bytes(
 
     unsafe {
         *bytes_p = ver_key.as_bytes().as_ptr();
-        *bytes_len_p = ver_key.as_bytes().len();
+        *bytes_len_p = ver_key.as_bytes().len() as i32;
     };
 
     let res = ErrorCode::Success;
@@ -504,7 +504,7 @@ pub extern "C" fn indy_bls_pop_new(
 #[no_mangle]
 pub extern "C" fn indy_bls_pop_from_bytes(
     bytes: *const u8,
-    bytes_len: usize,
+    bytes_len: i32,
     pop_p: *mut *const c_void,
 ) -> ErrorCode {
     trace!(
@@ -547,7 +547,7 @@ pub extern "C" fn indy_bls_pop_from_bytes(
 pub extern "C" fn indy_bls_pop_as_bytes(
     pop: *const c_void,
     bytes_p: *mut *const u8,
-    bytes_len_p: *mut usize,
+    bytes_len_p: *mut i32,
 ) -> ErrorCode {
     trace!(
         "indy_bls_pop_as_bytes: >>> pop: {:?}, bytes_p: {:?}, bytes_len_p: {:?}",
@@ -564,7 +564,7 @@ pub extern "C" fn indy_bls_pop_as_bytes(
 
     unsafe {
         *bytes_p = pop.as_bytes().as_ptr();
-        *bytes_len_p = pop.as_bytes().len();
+        *bytes_len_p = pop.as_bytes().len() as i32;
     };
 
     let res = ErrorCode::Success;
@@ -603,7 +603,7 @@ pub extern "C" fn indy_bls_pop_free(pop: *const c_void) -> ErrorCode {
 #[no_mangle]
 pub extern "C" fn indy_bls_signature_from_bytes(
     bytes: *const u8,
-    bytes_len: usize,
+    bytes_len: i32,
     signature_p: *mut *const c_void,
 ) -> ErrorCode {
     trace!(
@@ -649,7 +649,7 @@ pub extern "C" fn indy_bls_signature_from_bytes(
 pub extern "C" fn indy_bls_signature_as_bytes(
     signature: *const c_void,
     bytes_p: *mut *const u8,
-    bytes_len_p: *mut usize,
+    bytes_len_p: *mut i32,
 ) -> ErrorCode {
     trace!(
         "indy_bls_signature_as_bytes: >>> signature: {:?}, bytes_p: {:?}, bytes_len_p: {:?}",
@@ -666,7 +666,7 @@ pub extern "C" fn indy_bls_signature_as_bytes(
 
     unsafe {
         *bytes_p = signature.as_bytes().as_ptr();
-        *bytes_len_p = signature.as_bytes().len();
+        *bytes_len_p = signature.as_bytes().len() as i32;
     };
 
     let res = ErrorCode::Success;
@@ -705,7 +705,7 @@ pub extern "C" fn indy_bls_signature_free(signature: *const c_void) -> ErrorCode
 #[no_mangle]
 pub extern "C" fn indy_bls_multi_signature_new(
     signatures: *const *const c_void,
-    signatures_len: usize,
+    signatures_len: i32,
     multi_sig_p: *mut *const c_void,
 ) -> ErrorCode {
     trace!("indy_bls_multi_signature_new: >>> signatures: {:?}, signatures_len: {:?}, multi_sig_p: {:?}", signatures, signatures_len, multi_sig_p);
@@ -745,7 +745,7 @@ pub extern "C" fn indy_bls_multi_signature_new(
 #[no_mangle]
 pub extern "C" fn indy_bls_multi_signature_from_bytes(
     bytes: *const u8,
-    bytes_len: usize,
+    bytes_len: i32,
     multi_sig_p: *mut *const c_void,
 ) -> ErrorCode {
     trace!(
@@ -794,7 +794,7 @@ pub extern "C" fn indy_bls_multi_signature_from_bytes(
 pub extern "C" fn indy_bls_multi_signature_as_bytes(
     multi_sig: *const c_void,
     bytes_p: *mut *const u8,
-    bytes_len_p: *mut usize,
+    bytes_len_p: *mut i32,
 ) -> ErrorCode {
     trace!(
         "indy_bls_multi_signature_as_bytes: >>> multi_sig: {:?}, bytes_p: {:?}, bytes_len_p: {:?}",
@@ -815,7 +815,7 @@ pub extern "C" fn indy_bls_multi_signature_as_bytes(
 
     unsafe {
         *bytes_p = multi_sig.as_bytes().as_ptr();
-        *bytes_len_p = multi_sig.as_bytes().len();
+        *bytes_len_p = multi_sig.as_bytes().len() as i32;
     };
 
     let res = ErrorCode::Success;
@@ -860,7 +860,7 @@ pub extern "C" fn indy_bls_multi_signature_free(multi_sig: *const c_void) -> Err
 #[no_mangle]
 pub extern "C" fn indy_bls_sign(
     message: *const u8,
-    message_len: usize,
+    message_len: i64,
     sign_key: *const c_void,
     signature_p: *mut *const c_void,
 ) -> ErrorCode {
@@ -912,7 +912,7 @@ pub extern "C" fn indy_bls_sign(
 pub extern "C" fn indy_bls_verify(
     signature: *const c_void,
     message: *const u8,
-    message_len: usize,
+    message_len: i64,
     ver_key: *const c_void,
     gen: *const c_void,
     valid_p: *mut bool,
@@ -963,9 +963,9 @@ pub extern "C" fn indy_bls_verify(
 pub extern "C" fn indy_bls_verify_multi_sig(
     multi_sig: *const c_void,
     message: *const u8,
-    message_len: usize,
+    message_len: i64,
     ver_keys: *const *const c_void,
-    ver_keys_len: usize,
+    ver_keys_len: i32,
     gen: *const c_void,
     valid_p: *mut bool,
 ) -> ErrorCode {
@@ -1074,7 +1074,7 @@ mod tests {
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_generator_as_bytes(gen, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!gen.is_null());
@@ -1091,7 +1091,7 @@ mod tests {
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_generator_as_bytes(gen, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1122,7 +1122,7 @@ mod tests {
     fn indy_bls_sign_key_new_works() {
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
 
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
@@ -1141,7 +1141,7 @@ mod tests {
             9, 10, 31, 32,
         ];
         let seed = seed_v.as_ptr();
-        let seed_len = seed_v.len();
+        let seed_len = seed_v.len() as i32;
 
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
@@ -1155,12 +1155,12 @@ mod tests {
     fn indy_bls_sign_key_as_bytes_works() {
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_sign_key_as_bytes(sign_key, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!bytes.is_null());
@@ -1174,12 +1174,12 @@ mod tests {
     fn indy_bls_sign_key_from_bytes_works() {
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_sign_key_as_bytes(sign_key, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1198,7 +1198,7 @@ mod tests {
     fn indy_bls_sign_key_free_works() {
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1214,7 +1214,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1241,7 +1241,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1250,7 +1250,7 @@ mod tests {
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_ver_key_as_bytes(ver_key, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!bytes.is_null());
@@ -1274,7 +1274,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1283,7 +1283,7 @@ mod tests {
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_ver_key_as_bytes(ver_key, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!bytes.is_null());
@@ -1314,7 +1314,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1336,20 +1336,20 @@ mod tests {
     fn indy_bls_signature_as_bytes_works() {
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key, &mut signature);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_signature_as_bytes(signature, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!bytes.is_null());
@@ -1366,20 +1366,20 @@ mod tests {
     fn indy_bls_signature_from_bytes_works() {
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key, &mut signature);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_signature_as_bytes(signature, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!bytes.is_null());
@@ -1403,13 +1403,13 @@ mod tests {
     fn indy_bls_signature_free_works() {
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key, &mut signature);
@@ -1426,19 +1426,19 @@ mod tests {
     fn indy_bls_multi_signature_new_works() {
         let mut sign_key1: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key1);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut sign_key2: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key2);
         assert_eq!(err_code, ErrorCode::Success);
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature1: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key1, &mut signature1);
@@ -1451,8 +1451,11 @@ mod tests {
         let signatures = [signature1, signature2];
 
         let mut multi_sig: *const c_void = ptr::null();
-        let err_code =
-            indy_bls_multi_signature_new(signatures.as_ptr(), signatures.len(), &mut multi_sig);
+        let err_code = indy_bls_multi_signature_new(
+            signatures.as_ptr(),
+            signatures.len() as i32,
+            &mut multi_sig,
+        );
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!multi_sig.is_null());
 
@@ -1476,19 +1479,19 @@ mod tests {
     fn indy_bls_multi_signature_as_bytes_works() {
         let mut sign_key1: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key1);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut sign_key2: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key2);
         assert_eq!(err_code, ErrorCode::Success);
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature1: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key1, &mut signature1);
@@ -1501,13 +1504,16 @@ mod tests {
         let signatures = [signature1, signature2];
 
         let mut multi_sig: *const c_void = ptr::null();
-        let err_code =
-            indy_bls_multi_signature_new(signatures.as_ptr(), signatures.len(), &mut multi_sig);
+        let err_code = indy_bls_multi_signature_new(
+            signatures.as_ptr(),
+            signatures.len() as i32,
+            &mut multi_sig,
+        );
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!multi_sig.is_null());
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_multi_signature_as_bytes(multi_sig, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!bytes.is_null());
@@ -1533,19 +1539,19 @@ mod tests {
     fn indy_bls_multi_signature_from_bytes_works() {
         let mut sign_key1: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key1);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut sign_key2: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key2);
         assert_eq!(err_code, ErrorCode::Success);
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature1: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key1, &mut signature1);
@@ -1558,12 +1564,15 @@ mod tests {
         let signatures = [signature1, signature2];
 
         let mut multi_sig: *const c_void = ptr::null();
-        let err_code =
-            indy_bls_multi_signature_new(signatures.as_ptr(), signatures.len(), &mut multi_sig);
+        let err_code = indy_bls_multi_signature_new(
+            signatures.as_ptr(),
+            signatures.len() as i32,
+            &mut multi_sig,
+        );
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_multi_signature_as_bytes(multi_sig, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!bytes.is_null());
@@ -1597,19 +1606,19 @@ mod tests {
     fn indy_bls_multi_signature_free_works() {
         let mut sign_key1: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key1);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut sign_key2: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key2);
         assert_eq!(err_code, ErrorCode::Success);
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature1: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key1, &mut signature1);
@@ -1622,8 +1631,11 @@ mod tests {
         let signatures = [signature1, signature2];
 
         let mut multi_sig: *const c_void = ptr::null();
-        let err_code =
-            indy_bls_multi_signature_new(signatures.as_ptr(), signatures.len(), &mut multi_sig);
+        let err_code = indy_bls_multi_signature_new(
+            signatures.as_ptr(),
+            signatures.len() as i32,
+            &mut multi_sig,
+        );
         assert_eq!(err_code, ErrorCode::Success);
 
         let err_code = indy_bls_sign_key_free(sign_key1);
@@ -1650,7 +1662,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1660,7 +1672,7 @@ mod tests {
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key, &mut signature);
@@ -1693,13 +1705,13 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut sign_key2: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key2);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1709,7 +1721,7 @@ mod tests {
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key, &mut signature);
@@ -1745,7 +1757,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1780,7 +1792,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1793,7 +1805,7 @@ mod tests {
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_pop_as_bytes(pop, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!bytes.is_null());
@@ -1820,7 +1832,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1833,7 +1845,7 @@ mod tests {
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut bytes: *const u8 = ptr::null();
-        let mut bytes_len: usize = 0;
+        let mut bytes_len = 0;
         let err_code = indy_bls_pop_as_bytes(pop, &mut bytes, &mut bytes_len);
         assert_eq!(err_code, ErrorCode::Success);
         assert!(!bytes.is_null());
@@ -1867,7 +1879,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1900,7 +1912,7 @@ mod tests {
 
         let mut sign_key: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key);
         assert_eq!(err_code, ErrorCode::Success);
 
@@ -1939,19 +1951,19 @@ mod tests {
 
         let mut sign_key1: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key1);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut sign_key2: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key2);
         assert_eq!(err_code, ErrorCode::Success);
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature1: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key1, &mut signature1);
@@ -1964,8 +1976,11 @@ mod tests {
         let signatures = [signature1, signature2];
 
         let mut multi_sig: *const c_void = ptr::null();
-        let err_code =
-            indy_bls_multi_signature_new(signatures.as_ptr(), signatures.len(), &mut multi_sig);
+        let err_code = indy_bls_multi_signature_new(
+            signatures.as_ptr(),
+            signatures.len() as i32,
+            &mut multi_sig,
+        );
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut ver_key1: *const c_void = ptr::null();
@@ -1984,7 +1999,7 @@ mod tests {
             message,
             message_len,
             ver_keys.as_ptr(),
-            ver_keys.len(),
+            ver_keys.len() as i32,
             gen,
             &mut valid,
         );
@@ -2024,25 +2039,25 @@ mod tests {
 
         let mut sign_key1: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key1);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut sign_key2: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key2);
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut sign_key3: *const c_void = ptr::null();
         let seed: *const u8 = ptr::null();
-        let seed_len: usize = 0;
+        let seed_len = 0;
         let err_code = indy_bls_sign_key_new(seed, seed_len, &mut sign_key3);
         assert_eq!(err_code, ErrorCode::Success);
 
         let message_v = vec![1, 2, 3, 4, 5];
         let message = message_v.as_ptr();
-        let message_len = message_v.len();
+        let message_len = message_v.len() as i64;
 
         let mut signature1: *const c_void = ptr::null();
         let err_code = indy_bls_sign(message, message_len, sign_key1, &mut signature1);
@@ -2055,8 +2070,11 @@ mod tests {
         let signatures = [signature1, signature2];
 
         let mut multi_sig: *const c_void = ptr::null();
-        let err_code =
-            indy_bls_multi_signature_new(signatures.as_ptr(), signatures.len(), &mut multi_sig);
+        let err_code = indy_bls_multi_signature_new(
+            signatures.as_ptr(),
+            signatures.len() as i32,
+            &mut multi_sig,
+        );
         assert_eq!(err_code, ErrorCode::Success);
 
         let mut ver_key1: *const c_void = ptr::null();
@@ -2075,7 +2093,7 @@ mod tests {
             message,
             message_len,
             ver_keys.as_ptr(),
-            ver_keys.len(),
+            ver_keys.len() as i32,
             gen,
             &mut valid,
         );

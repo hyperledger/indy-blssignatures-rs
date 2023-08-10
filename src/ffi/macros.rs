@@ -39,7 +39,7 @@ macro_rules! check_useful_c_byte_array {
             ));
         }
 
-        let $ptr = unsafe { slice::from_raw_parts($ptr, $len) };
+        let $ptr = unsafe { slice::from_raw_parts($ptr, $len as usize) };
     };
 }
 
@@ -52,7 +52,7 @@ macro_rules! check_useful_opt_c_byte_array {
         let $ptr = if $ptr.is_null() {
             None
         } else {
-            unsafe { Some(slice::from_raw_parts($ptr, $len)) }
+            unsafe { Some(slice::from_raw_parts($ptr, $len as usize)) }
         };
     };
 }
@@ -86,7 +86,7 @@ macro_rules! check_useful_c_reference_array {
             ));
         }
 
-        let $ptrs: Vec<&$type> = unsafe { slice::from_raw_parts($ptrs, $ptrs_len) }
+        let $ptrs: Vec<&$type> = unsafe { slice::from_raw_parts($ptrs, $ptrs_len as usize) }
             .iter()
             .map(|ptr| unsafe { &*(*ptr as *const $type) })
             .collect();
