@@ -7,7 +7,7 @@ license = "Apache-2.0"
 name = "indy-blssignatures"
 readme = "README.md"
 repository = "https://github.com/hyperledger/indy-blssignatures-rs"
-version = "0.1.0"
+version = "0.1.1"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
