@@ -6,7 +6,7 @@ edition = "2021"
 license = "Apache-2.0"
 name = "indy-blssignatures"
 readme = "README.md"
-repository = "https://github.com/hyperledger/indy-blssignatures-rs"
+repository = "https://github.com/hyperledger-indy/indy-blssignatures-rs"
 version = "0.1.1"
 rust-version = "1.63"
 

@@ -44,6 +44,6 @@ repositories/artifacts.
 A Python wrapper for this crate can be found in the [indy-bls-wrapper-python] repository.
 
 [Hyperledger Ursa]: https://github.com/hyperledger/ursa
-[Hyperledger Indy Node]: https://github.com/hyperledger/indy-node
-[Hyperledger Indy Plenum]: https://github.com/hyperledger/indy-plenum
-[indy-bls-wrapper-python]: https://github.com/hyperledger/indy-bls-wrapper-python
+[Hyperledger Indy Node]: https://github.com/hyperledger-indy/indy-node
+[Hyperledger Indy Plenum]: https://github.com/hyperledger-indy/indy-plenum
+[indy-bls-wrapper-python]: https://github.com/hyperledger-indy/indy-bls-wrapper-python
